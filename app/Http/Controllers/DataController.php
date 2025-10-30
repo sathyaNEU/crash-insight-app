@@ -43,7 +43,7 @@ class DataController extends Controller
     {
         try {
             // Fetch data from Somerville API
-            $response = Http::withoutVerifying()->get('https://data-for-all.s3.us-east-1.amazonaws.com/Police_Data__Crashes_20251016.csv');
+            $response = Http::withoutVerifying()->get('https://data.somervillema.gov/resource/mtik-28va.json');
             if (!$response->successful()) {
                 return response()->json([
                     'success' => false,
@@ -116,27 +116,26 @@ class DataController extends Controller
                 if (isset($incident['ambntlightdesc']) && trim($incident['ambntlightdesc']) != '') {
                     $lightCondition = trim($incident['ambntlightdesc']);
                     
-                    if (!in_array(['id' => $id, 'name' => $lightCondition], $lightConditions)) {
-                        $exists = false;
-                        foreach ($lightConditions as $existing) {
-                            if ($existing['name'] === $lightCondition) {
-                                $exists = true;
-                                break;
-                            }
+                    // Check if this light condition already exists
+                    $exists = false;
+                    foreach ($lightConditions as $existing) {
+                        if ($existing['light_condition'] === $lightCondition) {
+                            $exists = true;
+                            break;
                         }
+                    }
+                    
+                    if (!$exists) {
+                        $lightConditions[] = [
+                            'id' => $id++,
+                            'light_condition' => $lightCondition
+                        ];
                         
-                        if (!$exists) {
-                            $lightConditions[] = [
-                                'id' => $id++,
-                                'name' => $lightCondition
-                            ];
-                            
-                            // Insert into database
-                            DB::table('light_conditions')->insertOrIgnore([
-                                'id' => $id - 1,
-                                'name' => $lightCondition
-                            ]);
-                        }
+                        // Insert into database
+                        DB::table('light_conditions')->insertOrIgnore([
+                            'id' => $id - 1,
+                            'light_condition' => $lightCondition
+                        ]);
                     }
                 }
             }
@@ -168,7 +167,7 @@ class DataController extends Controller
                     // Check if this weather condition already exists
                     $exists = false;
                     foreach ($weatherConditions as $existing) {
-                        if ($existing['name'] === $weatherCondition) {
+                        if ($existing['weather_condition'] === $weatherCondition) {
                             $exists = true;
                             break;
                         }
@@ -177,13 +176,13 @@ class DataController extends Controller
                     if (!$exists) {
                         $weatherConditions[] = [
                             'id' => $id++,
-                            'name' => $weatherCondition
+                            'weather_condition' => $weatherCondition
                         ];
                         
                         // Insert into database
                         DB::table('weather_conditions')->insertOrIgnore([
                             'id' => $id - 1,
-                            'name' => $weatherCondition
+                            'weather_condition' => $weatherCondition
                         ]);
                     }
                 }
@@ -215,7 +214,7 @@ class DataController extends Controller
                     // Check if this road surface already exists
                     $exists = false;
                     foreach ($roadSurfaces as $existing) {
-                        if ($existing['name'] === $roadSurface) {
+                        if ($existing['road_surface'] === $roadSurface) {
                             $exists = true;
                             break;
                         }
@@ -224,13 +223,13 @@ class DataController extends Controller
                     if (!$exists) {
                         $roadSurfaces[] = [
                             'id' => $id++,
-                            'name' => $roadSurface
+                            'road_surface' => $roadSurface
                         ];
                         
                         // Insert into database
                         DB::table('road_surface')->insertOrIgnore([
                             'id' => $id - 1,
-                            'name' => $roadSurface
+                            'road_surface' => $roadSurface
                         ]);
                     }
                 }
@@ -262,7 +261,7 @@ class DataController extends Controller
                     // Check if this traffic control device already exists
                     $exists = false;
                     foreach ($trafficControlDevices as $existing) {
-                        if ($existing['name'] === $deviceType) {
+                        if ($existing['tcd_type'] === $deviceType) {
                             $exists = true;
                             break;
                         }
@@ -271,13 +270,13 @@ class DataController extends Controller
                     if (!$exists) {
                         $trafficControlDevices[] = [
                             'id' => $id++,
-                            'name' => $deviceType
+                            'tcd_type' => $deviceType
                         ];
                         
                         // Insert into database
-                        DB::table('traffic_control_device')->insertOrIgnore([
+                        DB::table('traffic_control_device_type')->insertOrIgnore([
                             'id' => $id - 1,
-                            'name' => $deviceType
+                            'tcd_type' => $deviceType
                         ]);
                     }
                 }
@@ -309,7 +308,7 @@ class DataController extends Controller
                     // Check if this intersection type already exists
                     $exists = false;
                     foreach ($intersectionTypes as $existing) {
-                        if ($existing['name'] === $intersectionType) {
+                        if ($existing['rwi_type'] === $intersectionType) {
                             $exists = true;
                             break;
                         }
@@ -318,13 +317,13 @@ class DataController extends Controller
                     if (!$exists) {
                         $intersectionTypes[] = [
                             'id' => $id++,
-                            'name' => $intersectionType
+                            'rwi_type' => $intersectionType
                         ];
                         
                         // Insert into database
-                        DB::table('intersection_type')->insertOrIgnore([
+                        DB::table('roadway_intersection_type')->insertOrIgnore([
                             'id' => $id - 1,
-                            'name' => $intersectionType
+                            'rwi_type' => $intersectionType
                         ]);
                     }
                 }
@@ -356,7 +355,7 @@ class DataController extends Controller
                     // Check if this road type already exists
                     $exists = false;
                     foreach ($roadTypes as $existing) {
-                        if ($existing['name'] === $roadType) {
+                        if ($existing['trafficway'] === $roadType) {
                             $exists = true;
                             break;
                         }
@@ -365,13 +364,13 @@ class DataController extends Controller
                     if (!$exists) {
                         $roadTypes[] = [
                             'id' => $id++,
-                            'name' => $roadType
+                            'trafficway' => $roadType
                         ];
                         
                         // Insert into database
-                        DB::table('road_type')->insertOrIgnore([
+                        DB::table('trafficway')->insertOrIgnore([
                             'id' => $id - 1,
-                            'name' => $roadType
+                            'trafficway' => $roadType
                         ]);
                     }
                 }
@@ -403,7 +402,7 @@ class DataController extends Controller
                     // Check if this collision type already exists
                     $exists = false;
                     foreach ($collisionTypes as $existing) {
-                        if ($existing['name'] === $collisionType) {
+                        if ($existing['cm_type'] === $collisionType) {
                             $exists = true;
                             break;
                         }
@@ -412,13 +411,13 @@ class DataController extends Controller
                     if (!$exists) {
                         $collisionTypes[] = [
                             'id' => $id++,
-                            'name' => $collisionType
+                            'cm_type' => $collisionType
                         ];
                         
                         // Insert into database
-                        DB::table('collision_type')->insertOrIgnore([
+                        DB::table('collision_manner')->insertOrIgnore([
                             'id' => $id - 1,
-                            'name' => $collisionType
+                            'cm_type' => $collisionType
                         ]);
                     }
                 }
@@ -450,7 +449,7 @@ class DataController extends Controller
                     // Check if this event location already exists
                     $exists = false;
                     foreach ($eventLocations as $existing) {
-                        if ($existing['name'] === $location) {
+                        if ($existing['he_location'] === $location) {
                             $exists = true;
                             break;
                         }
@@ -459,13 +458,13 @@ class DataController extends Controller
                     if (!$exists) {
                         $eventLocations[] = [
                             'id' => $id++,
-                            'name' => $location
+                            'he_location' => $location
                         ];
                         
                         // Insert into database
-                        DB::table('event_location')->insertOrIgnore([
+                        DB::table('harmful_event_location')->insertOrIgnore([
                             'id' => $id - 1,
-                            'name' => $location
+                            'he_location' => $location
                         ]);
                     }
                 }
@@ -494,49 +493,49 @@ class DataController extends Controller
             foreach ($incidents as $incident) {
                 $lightConditionId = $this->getCategoryIdByValue(
                     $categories['light_conditions'], 
-                    'name', 
+                    'light_condition', 
                     isset($incident['ambntlightdesc']) ? trim($incident['ambntlightdesc']) : ''
                 );
                 
                 $weatherConditionId = $this->getCategoryIdByValue(
                     $categories['weather_conditions'], 
-                    'name', 
+                    'weather_condition', 
                     isset($incident['weathcond1desc']) ? trim($incident['weathcond1desc']) : ''
                 );
                 
                 $roadSurfaceId = $this->getCategoryIdByValue(
                     $categories['road_surfaces'], 
-                    'name', 
+                    'road_surface', 
                     isset($incident['roadsurfdesc']) ? trim($incident['roadsurfdesc']) : ''
                 );
                 
                 $trafficControlDeviceId = $this->getCategoryIdByValue(
                     $categories['traffic_control_devices'], 
-                    'name', 
+                    'tcd_type', 
                     isset($incident['trafcntrltypedesc']) ? trim($incident['trafcntrltypedesc']) : ''
                 );
                 
                 $intersectionTypeId = $this->getCategoryIdByValue(
                     $categories['intersection_types'], 
-                    'name', 
+                    'rwi_type', 
                     isset($incident['rdwyjuncdesc']) ? trim($incident['rdwyjuncdesc']) : ''
                 );
                 
                 $roadTypeId = $this->getCategoryIdByValue(
                     $categories['road_types'], 
-                    'name', 
+                    'trafficway', 
                     isset($incident['trafydescrdesc']) ? trim($incident['trafydescrdesc']) : ''
                 );
                 
                 $collisionTypeId = $this->getCategoryIdByValue(
                     $categories['collision_types'], 
-                    'name', 
+                    'cm_type', 
                     isset($incident['manrcolldesc']) ? trim($incident['manrcolldesc']) : ''
                 );
                 
                 $eventLocationId = $this->getCategoryIdByValue(
                     $categories['event_locations'], 
-                    'name', 
+                    'he_location', 
                     isset($incident['hrmfeventdesc1']) ? trim($incident['hrmfeventdesc1']) : ''
                 );
                 
@@ -545,15 +544,15 @@ class DataController extends Controller
                     'crash_num' => isset($incident['crashnum']) ? $incident['crashnum'] : null,
                     'incident_date' => isset($incident['dtcrash']) ? $incident['dtcrash'] : null,
                     'first_harmful_event' => isset($incident['hrmfeventdesc2']) ? trim($incident['hrmfeventdesc2']) : null,
-                    'location_id' => 1, // Placeholder
-                    'light_condition_id' => $lightConditionId,
-                    'weather_condition_id' => $weatherConditionId,
+                    'dim_location_id' => 1, // Placeholder
+                    'light_conditions_id' => $lightConditionId,
+                    'weather_conditions_id' => $weatherConditionId,
                     'road_surface_id' => $roadSurfaceId,
-                    'traffic_control_device_id' => $trafficControlDeviceId,
-                    'intersection_type_id' => $intersectionTypeId,
-                    'road_type_id' => $roadTypeId,
-                    'collision_type_id' => $collisionTypeId,
-                    'event_location_id' => $eventLocationId,
+                    'traffic_control_device_type_id' => $trafficControlDeviceId,
+                    'roadway_intersection_type_id' => $intersectionTypeId,
+                    'trafficway_id' => $roadTypeId,
+                    'collision_manner_id' => $collisionTypeId,
+                    'harmful_event_location_id' => $eventLocationId,
                     'is_work_zone' => isset($incident['workzonerelddesc']) ? $incident['workzonerelddesc'] : null,
                     'cnt_fatal_injury' => isset($incident['fatalinjury']) ? intval($incident['fatalinjury']) : 0,
                     'cnt_sus_serious_injury' => isset($incident['suspectedseriousinjury']) ? intval($incident['suspectedseriousinjury']) : 0,
@@ -562,7 +561,7 @@ class DataController extends Controller
                     'cnt_cyclist' => isset($incident['nonmotoristcyclist']) ? intval($incident['nonmotoristcyclist']) : 0,
                     'is_hit_and_run' => isset($incident['hitrunflag']) ? $incident['hitrunflag'] : null,
                     'incident_location' => isset($incident['address']) ? $incident['address'] : null,
-                    'latitude' => isset($incident['latitude']) ? $incident['latitude'] : null,
+                    'latitute' => isset($incident['latitude']) ? $incident['latitude'] : null,
                     'longitude' => isset($incident['longitude']) ? $incident['longitude'] : null,
                 ];
                 
