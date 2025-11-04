@@ -20,3 +20,5 @@ Route::get('/v1/incidents', [DataController::class, 'getIncidents']);
 
 // POST endpoint to load all dimensions and facts
 Route::post('/v1/load', [DataController::class, 'loadData']);
+
+Route::get('/v1/dashboard', [DataController::class, 'getDashboardMetrics']);

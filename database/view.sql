@@ -12,7 +12,7 @@ SELECT
     i.cnt_cyclist,
     i.is_hit_and_run,
     i.incident_location,
-    i.latitute,
+    i.latitude,
     i.longitude,
 
     -- Dimension lookups
