@@ -61,16 +61,23 @@ export default function QAComponent() {
   useEffect(() => {
     if (activeThreadId && messages.length > 0) {
       setThreads(prevThreads => 
-        prevThreads.map(thread => 
-          thread.id === activeThreadId 
-            ? { 
-                ...thread, 
-                messages, 
-                updatedAt: new Date().toISOString(),
-                preview: messages[messages.length - 1]?.content.substring(0, 60) + '...'
-              }
-            : thread
-        )
+        prevThreads.map(thread => {
+          if (thread.id === activeThreadId) {
+            // If thread title is still "New conversation", update it with first user message
+            const newTitle = thread.title === 'New conversation' && messages.length >= 1 && messages[0].role === 'user'
+              ? (messages[0].content.length > 50 ? messages[0].content.substring(0, 50) + '...' : messages[0].content)
+              : thread.title;
+            
+            return {
+              ...thread,
+              title: newTitle,
+              messages, 
+              updatedAt: new Date().toISOString(),
+              preview: messages[messages.length - 1]?.content.substring(0, 60) + '...'
+            };
+          }
+          return thread;
+        })
       );
     }
   }, [messages, activeThreadId]);
@@ -86,7 +93,7 @@ export default function QAComponent() {
   const createNewThread = () => {
     const newThread = {
       id: Date.now().toString(),
-      title: `Chat ${threads.length + 1}`,
+      title: 'New conversation',
       messages: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -135,13 +142,14 @@ export default function QAComponent() {
 
     // Create new thread if none exists
     if (!activeThreadId) {
+      const threadTitle = input.length > 50 ? input.substring(0, 50) + '...' : input;
       const newThread = {
         id: Date.now().toString(),
-        title: input.substring(0, 30) + (input.length > 30 ? '...' : ''),
+        title: threadTitle,
         messages: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        preview: input.substring(0, 60) + '...'
+        preview: threadTitle
       };
       
       setThreads(prev => [newThread, ...prev]);
