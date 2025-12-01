@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Car, Database, Upload, BarChart3, Brain } from 'lucide-react';
+import { Car, Database, Upload, BarChart3, Brain, MessageCircle } from 'lucide-react';
 import ViewIncidentsComponent from './ViewIncidents';
 import LoadDataComponent from './LoadData';
 import DashboardComponent from './Dashboard';
 import ReportComponent from './Reports';
+import QAComponent from './QA';
 
 export default function HomeComponent() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -12,7 +13,8 @@ export default function HomeComponent() {
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, component: DashboardComponent },
     { id: 'view', label: 'View Incidents', icon: Database, component: ViewIncidentsComponent },
     { id: 'load', label: 'Load Data', icon: Upload, component: LoadDataComponent },
-    { id: 'reports', label: 'AI - Insights', icon: Brain, component: ReportComponent }
+    { id: 'reports', label: 'AI - Insights', icon: Brain, component: ReportComponent },
+    { id: 'qa', label: 'Q&A Assistant', icon: MessageCircle, component: QAComponent }
   ];
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component;

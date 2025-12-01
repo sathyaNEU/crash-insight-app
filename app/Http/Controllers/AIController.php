@@ -22,24 +22,26 @@ class AIController extends Controller
         try {
             $request->validate([
                 'question' => 'required|string',
-                'data' => 'required|array',
+                'data' => 'nullable|array', // Changed from 'required' to 'nullable'
+                'mode' => 'required|string|in:report,qa',
                 'isFollowUp' => 'boolean',
                 'conversationHistory' => 'array'
             ]);
 
             $question = $request->input('question');
-            $data = $request->input('data');
+            $data = $request->input('data', []); // Provide default empty array
+            $mode = $request->input('mode');
             $isFollowUp = $request->input('isFollowUp', false);
             $conversationHistory = $request->input('conversationHistory', []);
 
             // Convert data to CSV-like string
             $csvString = $this->convertDataToCsv($data);
 
-            // Generate the report or answer follow-up
+            // Generate response based on mode
             if (!$isFollowUp) {
-                $response = $this->generateReport($question, $csvString);
+                $response = $this->generateInitialResponse($question, $csvString, $mode);
             } else {
-                $response = $this->answerFollowUp($question, $csvString, $conversationHistory);
+                $response = $this->answerFollowUp($question, $csvString, $conversationHistory, $mode);
             }
 
             return response()->json([
@@ -48,6 +50,7 @@ class AIController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('AI Chat Error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage()
@@ -55,9 +58,29 @@ class AIController extends Controller
         }
     }
 
-    private function generateReport($question, $csvString)
+    private function generateInitialResponse($question, $csvString, $mode)
     {
-        $prompt = "You are a report generation agent.
+        $prompt = $this->buildPrompt($mode, $question, $csvString);
+        return $this->callMistralAPI($prompt);
+    }
+
+    private function buildPrompt($mode, $question, $csvString)
+    {
+        switch ($mode) {
+            case 'report':
+                return $this->getReportPrompt($question, $csvString);
+            
+            case 'qa':
+                return $this->getQAPrompt($question, $csvString);
+            
+            default:
+                throw new \Exception('Invalid mode specified');
+        }
+    }
+
+    private function getReportPrompt($question, $csvString)
+    {
+        return "You are a report generation agent.
 
 Task:
 - Generate a crisp, data-driven report based only on the given context below.
@@ -71,50 +94,99 @@ Task:
 Context:
 Generate a report about: {$question} based on the below data
 {$csvString}";
-
-        return $this->callMistralAPI($prompt);
     }
 
-    private function answerFollowUp($question, $csvString, $conversationHistory)
+    private function getQAPrompt($question, $csvString)
     {
-        // Build context from conversation history
-        $contextMessages = [];
+        return "You are a helpful Q&A assistant with access to a dataset.
+
+Task:
+- Answer the user's question accurately based on the data provided below.
+- Be concise and direct in your response.
+- If the answer requires data analysis, provide clear insights with supporting numbers.
+- If the data doesn't contain information to answer the question, politely say so.
+- Output ONLY pure Markdown content.
+- Do NOT wrap your response in code blocks (no ```markdown or ``` tags).
+- Do NOT include any preamble - start directly with your answer.
+
+User's Question: {$question}
+
+Available Data:
+{$csvString}";
+    }
+
+    private function answerFollowUp($question, $csvString, $conversationHistory, $mode)
+    {
+        // Build messages array from conversation history
+        $messages = [];
+        
+        // Add system message with data context
+        $systemPrompt = $this->getFollowUpSystemPrompt($mode, $csvString);
+        $messages[] = [
+            'role' => 'system',
+            'content' => $systemPrompt
+        ];
+
+        // Add all previous conversation messages
         foreach ($conversationHistory as $message) {
-            if ($message['role'] === 'assistant') {
-                $contextMessages[] = [
-                    'role' => 'assistant',
+            if (isset($message['role']) && isset($message['content']) && 
+                in_array($message['role'], ['user', 'assistant'])) {
+                $messages[] = [
+                    'role' => $message['role'],
                     'content' => $message['content']
                 ];
             }
         }
 
-        $prompt = "You are a helpful data analyst assistant. Answer the user's follow-up question based on the previous conversation and the data provided.
+        // Add the new user question
+        $messages[] = [
+            'role' => 'user',
+            'content' => $question
+        ];
 
-Previous analysis context exists in the conversation history.
+        Log::info('Follow-up messages prepared', [
+            'message_count' => count($messages),
+            'mode' => $mode
+        ]);
 
-User's question: {$question}
+        return $this->callMistralAPIWithMessages($messages);
+    }
 
-Data context (top 10 records):
+    private function getFollowUpSystemPrompt($mode, $csvString)
+    {
+        $baseContext = "You are a helpful assistant. Answer follow-up questions based on the conversation history and the data provided.
+
+Data context:
 {$csvString}
 
-Provide a clear, concise answer in Markdown format. Do NOT use code blocks. Start directly with your answer.";
+Instructions:
+- Provide clear, concise answers in Markdown format
+- Do NOT use code blocks or wrap responses in ```markdown
+- Start directly with your answer
+- Reference previous conversation context when relevant";
 
-        return $this->callMistralAPI($prompt, $contextMessages);
+        return $baseContext;
     }
 
     private function callMistralAPI($prompt, $previousMessages = [])
     {
-        try {
-            $messages = array_merge($previousMessages, [
-                ['role' => 'user', 'content' => $prompt]
-            ]);
+        $messages = array_merge($previousMessages, [
+            ['role' => 'user', 'content' => $prompt]
+        ]);
 
+        return $this->callMistralAPIWithMessages($messages);
+    }
+
+    private function callMistralAPIWithMessages($messages)
+    {
+        try {
             Log::info('Calling Mistral API', [
-                'message_count' => count($messages)
+                'message_count' => count($messages),
+                'model' => $this->model
             ]);
 
             $response = Http::timeout(30)
-                ->withoutVerifying() // Add this line for local development
+                ->withoutVerifying()
                 ->withHeaders([
                     'Authorization' => 'Bearer ' . $this->apiKey,
                     'Content-Type' => 'application/json',
@@ -146,13 +218,16 @@ Provide a clear, concise answer in Markdown format. Do NOT use code blocks. Star
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             Log::error('Connection error to Mistral API: ' . $e->getMessage());
             throw new \Exception('Failed to connect to AI service. Please try again.');
+        } catch (\Exception $e) {
+            Log::error('Mistral API call error: ' . $e->getMessage());
+            throw $e;
         }
     }
 
     private function convertDataToCsv($data)
     {
         if (empty($data)) {
-            return "No data available";
+            return "No additional data context provided.";
         }
 
         // Get headers from first record
@@ -163,7 +238,7 @@ Provide a clear, concise answer in Markdown format. Do NOT use code blocks. Star
         foreach ($data as $row) {
             $values = [];
             foreach ($headers as $header) {
-                $value = $row[$header] ?? '';
+                $value = isset($row[$header]) ? $row[$header] : '';
                 // Escape commas and quotes
                 if (strpos($value, ',') !== false || strpos($value, '"') !== false) {
                     $value = '"' . str_replace('"', '""', $value) . '"';

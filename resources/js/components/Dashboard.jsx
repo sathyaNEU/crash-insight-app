@@ -183,6 +183,7 @@ export default function DashboardComponent() {
         body: JSON.stringify({
           question: initialQuestion,
           data: top10Records,
+          mode: 'report',
           isFollowUp: false
         })
       });
@@ -216,6 +217,7 @@ export default function DashboardComponent() {
         body: JSON.stringify({
           question: newQuestion,
           data: top10Records,
+          mode: 'report',
           isFollowUp: true,
           conversationHistory: aiMessages
         })
