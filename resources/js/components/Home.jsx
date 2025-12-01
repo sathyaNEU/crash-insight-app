@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Car, Database, Upload, BarChart3 } from 'lucide-react';
+import { Car, Database, Upload, BarChart3, Brain } from 'lucide-react';
 import ViewIncidentsComponent from './ViewIncidents';
 import LoadDataComponent from './LoadData';
 import DashboardComponent from './Dashboard';
+import ReportComponent from './Reports';
 
 export default function HomeComponent() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -11,6 +12,7 @@ export default function HomeComponent() {
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, component: DashboardComponent },
     { id: 'view', label: 'View Incidents', icon: Database, component: ViewIncidentsComponent },
     { id: 'load', label: 'Load Data', icon: Upload, component: LoadDataComponent },
+    { id: 'reports', label: 'AI - Insights', icon: Brain, component: ReportComponent }
   ];
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component;
@@ -28,7 +30,9 @@ export default function HomeComponent() {
               <h1 className="text-2xl font-bold text-slate-900">
                 Somerville Crash Analysis
               </h1>
-              <p className="text-sm text-slate-600">Traffic incident data management system</p>
+              <p className="text-sm text-slate-600">
+                Traffic incident data management system
+              </p>
             </div>
           </div>
         </div>

@@ -42,3 +42,31 @@ LEFT JOIN collision_manner cm
     ON i.collision_manner_id = cm.id
 LEFT JOIN harmful_event_location he 
     ON i.harmful_event_location_id = he.id;
+
+
+-- Report 1: Identify incidents with fatalities or serious injuries 
+-- that occurred under ideal conditions (clear weather, daylight, dry roads, no work zone)
+CREATE OR REPLACE VIEW report_1 AS 
+SELECT *
+FROM incidents_view
+WHERE light_condition = 'DAYLIGHT'
+  AND weather_condition = 'CLEAR'
+  AND road_surface = 'DRY'
+  AND is_work_zone = 'N'
+  AND (cnt_fatal_injury + cnt_sus_serious_injury) > 0;
+
+
+-- Report 2: Retrieve sample crash records that occurred inside work zones
+CREATE OR REPLACE VIEW report_2 AS
+SELECT *
+FROM incidents_view
+WHERE is_work_zone = 'Y'
+LIMIT 10;
+
+
+-- Report 3: List hit-and-run incidents involving collisions with parked motor vehicles
+CREATE OR REPLACE VIEW report_3 AS
+SELECT *
+FROM incidents_view
+WHERE first_harmful_event = 'COLLISION WITH PARKED MOTOR VEHICLE'
+  AND is_hit_and_run = 'Y';

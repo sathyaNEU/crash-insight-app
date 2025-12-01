@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DataController;
+use App\Http\Controllers\AIController;
 
 /*
 |--------------------------------------------------------------------------
@@ -22,3 +23,6 @@ Route::get('/v1/incidents', [DataController::class, 'getIncidents']);
 Route::post('/v1/load', [DataController::class, 'loadData']);
 
 Route::get('/v1/dashboard', [DataController::class, 'getDashboardMetrics']);
+
+// AI Chat endpoint
+Route::post('/v1/ai/chat', [AIController::class, 'chat']);

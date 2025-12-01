@@ -1,0 +1,10 @@
+pandas 
+mysql-connector-python
+mistralai
+python-dotenv
+langchain 
+langchain-openai 
+langchain-pinecone 
+pinecone-client
+fastapi
+uvicorn
