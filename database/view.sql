@@ -70,3 +70,23 @@ SELECT *
 FROM incidents_view
 WHERE first_harmful_event = 'COLLISION WITH PARKED MOTOR VEHICLE'
   AND is_hit_and_run = 'Y';
+
+-- Report 4.1 - top 5 locations with the highest number of incidents
+create or replace view report_4_1 as 
+select incident_location, count(*) cnt from incidents_view 
+group by incident_location
+order by cnt desc 
+limit 5;
+
+-- Report 4.2 - detailed incident records from the top 5 high-incident locations
+create or replace view report_4_2 as
+select * from incidents_view 
+where incident_location in (
+    select incident_location from report_4_1
+);
+
+-- Report 5 - traffic control and intersection types involved in severe injury or fatal crashes
+create or replace view report_5 as
+select traffic_control_device_type, roadway_intersection_type 
+from incidents_view 
+where (cnt_fatal_injury + cnt_sus_serious_injury) > 0;

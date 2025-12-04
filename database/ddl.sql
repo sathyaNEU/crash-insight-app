@@ -121,7 +121,6 @@ CREATE TABLE IF NOT EXISTS `app_db`.`incidents` (
   `crash_num` INT NULL,
   `incident_date` DATETIME NULL,
   `first_harmful_event` VARCHAR(255) NULL,
-  `dim_location_id` INT NOT NULL,
   `light_conditions_id` INT NOT NULL,
   `weather_conditions_id` INT NOT NULL,
   `road_surface_id` INT NOT NULL,

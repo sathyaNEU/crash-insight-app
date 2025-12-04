@@ -19,6 +19,16 @@ export default function ReportComponent() {
       id: "report_3",
       question: "How does weather affect crash severity?",
       file: "/ai/computed/report_3.md"
+    },
+    {
+      id: "report_4",
+      question: "Identifying High-Risk Locations With the Most Frequent Incident Occurrences?",
+      file: "/ai/computed/report_4.md"
+    },
+    {
+      id: "report_5",
+      question: "Examining Traffic Control and Intersection Types in Severe or Fatal Crashes",
+      file: "/ai/computed/report_5.md"
     }
   ]);
 

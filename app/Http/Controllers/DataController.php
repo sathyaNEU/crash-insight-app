@@ -544,7 +544,6 @@ class DataController extends Controller
                     'crash_num' => isset($incident['crashnum']) ? $incident['crashnum'] : null,
                     'incident_date' => isset($incident['dtcrash']) ? $incident['dtcrash'] : null,
                     'first_harmful_event' => isset($incident['hrmfeventdesc2']) ? trim($incident['hrmfeventdesc2']) : null,
-                    'dim_location_id' => 1, // Placeholder
                     'light_conditions_id' => $lightConditionId,
                     'weather_conditions_id' => $weatherConditionId,
                     'road_surface_id' => $roadSurfaceId,
