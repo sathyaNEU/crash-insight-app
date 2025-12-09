@@ -10,11 +10,11 @@ export default function HomeComponent() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: BarChart3, component: DashboardComponent },
-    { id: 'view', label: 'View Incidents', icon: Database, component: ViewIncidentsComponent },
     { id: 'load', label: 'Load Data', icon: Upload, component: LoadDataComponent },
-    { id: 'reports', label: 'AI - Insights', icon: Brain, component: ReportComponent },
-    { id: 'qa', label: 'Q&A Assistant', icon: MessageCircle, component: QAComponent }
+    { id: 'view', label: 'View Incidents', icon: Database, component: ViewIncidentsComponent },
+    { id: 'dashboard', label: 'Dashboard', icon: BarChart3, component: DashboardComponent },
+    { id: 'reports', label: 'AI - Insights (Pre-computed Reports)', icon: Brain, component: ReportComponent },
+    { id: 'qa', label: 'Q&A Assistant (RAG)', icon: MessageCircle, component: QAComponent }
   ];
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component;
