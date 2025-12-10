@@ -1,15 +1,14 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import Plot from 'react-plotly.js';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { RefreshCw, BarChart3, Filter, X, Sparkles, Send } from 'lucide-react';
+import { RefreshCw, BarChart3, Filter, X, Sparkles, Send, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function DashboardComponent() {
   const [allIncidents, setAllIncidents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Filter states - single select (null means no filter)
   const [filters, setFilters] = useState({
     weather: null,
     light: null,
@@ -17,12 +16,22 @@ export default function DashboardComponent() {
     workzone: null
   });
 
-  // AI Chat states
   const [showAIChat, setShowAIChat] = useState(false);
   const [aiMessages, setAiMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [questionCount, setQuestionCount] = useState(0);
+  const chatEndRef = useRef(null);
+
+  const scrollToChat = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  useEffect(() => {
+    if (aiMessages.length > 0) {
+      scrollToChat();
+    }
+  }, [aiMessages]);
 
   const fetchAllIncidents = async () => {
     setLoading(true);
@@ -45,7 +54,6 @@ export default function DashboardComponent() {
     fetchAllIncidents();
   }, []);
 
-  // Get unique filter options from raw data
   const filterOptions = useMemo(() => {
     if (!allIncidents.length) return null;
     
@@ -60,11 +68,9 @@ export default function DashboardComponent() {
     };
   }, [allIncidents]);
 
-  // Apply filters and compute all metrics
   const computedData = useMemo(() => {
     if (!allIncidents.length) return null;
 
-    // Filter incidents based on active filters
     const filteredIncidents = allIncidents.filter(incident => {
       if (filters.weather && incident.weather_condition !== filters.weather) return false;
       if (filters.light && incident.light_condition !== filters.light) return false;
@@ -73,7 +79,6 @@ export default function DashboardComponent() {
       return true;
     });
 
-    // Compute summary metrics
     const summary = {
       total_incidents: filteredIncidents.length,
       fatal_injuries: filteredIncidents.reduce((sum, i) => sum + (parseInt(i.cnt_fatal_injury) || 0), 0),
@@ -81,11 +86,10 @@ export default function DashboardComponent() {
       minor_injuries: filteredIncidents.reduce((sum, i) => sum + (parseInt(i.cnt_non_incapacitating_injury) || 0), 0)
     };
 
-    // Compute monthly trends
     const monthlyMap = {};
     filteredIncidents.forEach(incident => {
       if (incident.incident_date) {
-        const month = incident.incident_date.substring(0, 7); // YYYY-MM
+        const month = incident.incident_date.substring(0, 7);
         monthlyMap[month] = (monthlyMap[month] || 0) + 1;
       }
     });
@@ -93,7 +97,6 @@ export default function DashboardComponent() {
       .map(([month, total]) => ({ month, total }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    // Compute geo points (limit to 1000 for performance)
     const geo_points = filteredIncidents
       .filter(i => i.latitude && i.longitude)
       .slice(0, 1000)
@@ -105,42 +108,11 @@ export default function DashboardComponent() {
         cnt_sus_serious_injury: i.cnt_sus_serious_injury || 0
       }));
 
-    // Compute breakdowns by category
-    const groupBy = (arr, key) => {
-      const map = {};
-      arr.forEach(item => {
-        const val = item[key] || 'Unknown';
-        if (!map[val]) map[val] = { total: 0, fatal: 0, serious: 0 };
-        map[val].total += 1;
-        map[val].fatal += parseInt(item.cnt_fatal_injury) || 0;
-        map[val].serious += parseInt(item.cnt_sus_serious_injury) || 0;
-      });
-      return Object.entries(map).map(([name, stats]) => ({ name, ...stats }));
-    };
-
-    const by_weather = groupBy(filteredIncidents, 'weather_condition');
-    const by_light = groupBy(filteredIncidents, 'light_condition');
-    const by_collision = groupBy(filteredIncidents, 'collision_manner');
-    
-    const by_workzone = ['Y', 'N'].map(val => {
-      const filtered = filteredIncidents.filter(i => i.work_zone_related === val);
-      return {
-        name: val === 'Y' ? 'Work Zone' : 'Non-Work Zone',
-        total: filtered.length,
-        fatal: filtered.reduce((sum, i) => sum + (parseInt(i.cnt_fatal_injury) || 0), 0),
-        serious: filtered.reduce((sum, i) => sum + (parseInt(i.cnt_sus_serious_injury) || 0), 0)
-      };
-    });
-
     return {
       summary,
       monthly_trends,
       geo_points,
-      by_weather,
-      by_light,
-      by_collision,
-      by_workzone,
-      filteredIncidents // Keep the full filtered incidents for AI
+      filteredIncidents
     };
   }, [allIncidents, filters]);
 
@@ -167,14 +139,12 @@ export default function DashboardComponent() {
     setQuestionCount(0);
     setAiMessages([]);
     
-    // Prepare initial question
     const initialQuestion = "Please explain the trend in this data, explain why these accidents happened, what we could have done to help prevent it";
     
     setAiMessages([{ role: 'user', content: initialQuestion }]);
     setAiLoading(true);
 
     try {
-      // Get top 10 filtered records
       const top10Records = computedData.filteredIncidents.slice(0, 10);
       
       const response = await fetch('/api/v1/ai/chat', {
@@ -238,19 +208,21 @@ export default function DashboardComponent() {
   if (loading) {
     return (
       <div className="text-center py-20">
-        <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-        <p className="text-slate-600">Loading interactive dashboard...</p>
+        <div className="inline-block p-4 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl pulse-glow mb-6">
+          <RefreshCw className="w-12 h-12 animate-spin text-white" />
+        </div>
+        <p className="text-lg text-slate-700 font-medium">Loading interactive dashboard...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-20">
-        <div className="text-red-600 mb-4">{error}</div>
+      <div className="text-center py-20 glass rounded-3xl p-12">
+        <div className="text-red-600 mb-6 text-lg font-medium">{error}</div>
         <button
           onClick={fetchAllIncidents}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:scale-105 transition-all shadow-2xl font-semibold"
         >
           Retry
         </button>
@@ -260,15 +232,14 @@ export default function DashboardComponent() {
 
   if (!computedData || !filterOptions) {
     return (
-      <div className="text-center py-20">
-        <p className="text-slate-600">No incident data available</p>
+      <div className="text-center py-20 glass rounded-3xl p-12">
+        <p className="text-slate-600 text-lg">No incident data available</p>
       </div>
     );
   }
 
   const { summary, monthly_trends, geo_points } = computedData;
 
-  // Geo map coordinates
   const latitudes = geo_points.map(p => parseFloat(p.latitude));
   const longitudes = geo_points.map(p => parseFloat(p.longitude));
   const hoverTexts = geo_points.map(p =>
@@ -278,195 +249,152 @@ export default function DashboardComponent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <BarChart3 className="w-6 h-6 text-blue-600" />
-          <h2 className="text-xl font-semibold text-slate-900">Interactive Analytics Dashboard</h2>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleExplainWithAI}
-            className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-lg transition-all shadow-md"
-          >
-            <Sparkles className="w-4 h-4" />
-            Explain with AI
-          </button>
-          {hasActiveFilters && (
+      <div className="glass rounded-2xl p-6 card-hover">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl">
+              <BarChart3 className="w-6 h-6 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold gradient-text">Interactive Analytics Dashboard</h2>
+          </div>
+          <div className="flex items-center gap-3">
             <button
-              onClick={clearFilters}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              onClick={handleExplainWithAI}
+              className="flex items-center gap-2 px-6 py-3 text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl transition-all shadow-lg hover:shadow-purple-500/50 hover:scale-105 font-semibold btn-vibrant"
             >
-              <X className="w-4 h-4" />
-              Clear Filters
+              <Sparkles className="w-5 h-5" />
+              Explain with AI
             </button>
-          )}
-          <button
-            onClick={fetchAllIncidents}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-2 px-6 py-3 bg-slate-700 text-white rounded-xl transition-all hover:bg-slate-800 hover:scale-105 font-semibold shadow-lg"
+              >
+                <X className="w-4 h-4" />
+                Clear Filters
+              </button>
+            )}
+            <button
+              onClick={fetchAllIncidents}
+              disabled={loading}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-all hover:scale-105 shadow-lg font-semibold"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* AI Chat Modal */}
+      {/* Inline AI Chat Section */}
       {showAIChat && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-purple-600" />
-                <h3 className="font-semibold text-slate-900">AI Analysis</h3>
+        <div className="glass rounded-2xl overflow-hidden slide-in-up">
+          <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-gradient-to-r from-purple-50 to-pink-50">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl pulse-glow">
+                <Sparkles className="w-5 h-5 text-white" />
               </div>
-              <button onClick={() => setShowAIChat(false)} className="text-slate-500 hover:text-slate-700">
-                <X className="w-5 h-5" />
-              </button>
+              <div>
+                <h3 className="font-bold text-slate-900 text-xl">AI Analysis</h3>
+                <p className="text-sm text-slate-600">Ask questions about the data trends</p>
+              </div>
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <style>{`
-                .ai-markdown h1 {
-                  font-size: 1.25rem;
-                  font-weight: 700;
-                  color: #0f172a;
-                  margin-bottom: 0.75rem;
-                  margin-top: 0.5rem;
-                }
-                .ai-markdown h2 {
-                  font-size: 1.125rem;
-                  font-weight: 600;
-                  color: #1e293b;
-                  margin-top: 1rem;
-                  margin-bottom: 0.5rem;
-                  padding-bottom: 0.25rem;
-                  border-bottom: 1px solid #e2e8f0;
-                }
-                .ai-markdown h3 {
-                  font-size: 1rem;
-                  font-weight: 600;
-                  color: #334155;
-                  margin-top: 0.75rem;
-                  margin-bottom: 0.5rem;
-                }
-                .ai-markdown p {
-                  margin-bottom: 0.75rem;
-                  line-height: 1.6;
-                  font-size: 0.875rem;
-                  color: #475569;
-                }
-                .ai-markdown ul, .ai-markdown ol {
-                  margin-bottom: 0.75rem;
-                  padding-left: 1.25rem;
-                  font-size: 0.875rem;
-                }
-                .ai-markdown li {
-                  margin-bottom: 0.25rem;
-                  line-height: 1.6;
-                  color: #475569;
-                }
-                .ai-markdown strong {
-                  font-weight: 600;
-                  color: #1e293b;
-                }
-                .ai-markdown code {
-                  background-color: #f1f5f9;
-                  padding: 0.125rem 0.25rem;
-                  border-radius: 0.25rem;
-                  font-size: 0.8125rem;
-                  color: #e11d48;
-                }
-                .ai-markdown pre {
-                  background-color: #f8fafc;
-                  padding: 0.75rem;
-                  border-radius: 0.375rem;
-                  overflow-x: auto;
-                  margin-bottom: 0.75rem;
-                  border: 1px solid #e2e8f0;
-                }
-                .ai-markdown pre code {
-                  background-color: transparent;
-                  padding: 0;
-                  color: #334155;
-                  font-size: 0.8125rem;
-                }
-              `}</style>
-              {aiMessages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-lg p-3 ${
-                    msg.role === 'user' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-slate-100 text-slate-900'
-                  }`}>
-                    {msg.role === 'assistant' ? (
-                      <div className="ai-markdown">
-                        <Markdown remarkPlugins={[remarkGfm]}>
-                          {msg.content}
-                        </Markdown>
-                      </div>
-                    ) : (
-                      <p className="text-sm">{msg.content}</p>
-                    )}
+            <button 
+              onClick={() => setShowAIChat(false)} 
+              className="p-2 hover:bg-white rounded-xl transition-colors"
+              title="Close AI Chat"
+            >
+              <X className="w-5 h-5 text-slate-600" />
+            </button>
+          </div>
+          
+          <div className="p-6 space-y-4 max-h-[600px] overflow-y-auto bg-gradient-to-b from-white to-purple-50/30">
+            {aiMessages.map((msg, idx) => (
+              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} chat-bubble`}>
+                <div className={`max-w-[85%] rounded-2xl p-5 shadow-lg ${
+                  msg.role === 'user' 
+                    ? 'bg-gradient-to-br from-purple-600 to-pink-600 text-white' 
+                    : 'bg-white text-slate-900 border-2 border-slate-200'
+                }`}>
+                  {msg.role === 'assistant' ? (
+                    <div className="prose prose-sm max-w-none">
+                      <Markdown remarkPlugins={[remarkGfm]}>{msg.content}</Markdown>
+                    </div>
+                  ) : (
+                    <p className="text-sm font-medium">{msg.content}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+            {aiLoading && (
+              <div className="flex justify-start">
+                <div className="bg-white rounded-2xl p-4 shadow-lg border-2 border-slate-200">
+                  <div className="flex items-center gap-3">
+                    <RefreshCw className="w-5 h-5 animate-spin text-purple-600" />
+                    <span className="text-sm text-slate-600 font-medium">Analyzing...</span>
                   </div>
                 </div>
-              ))}
-              {aiLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-slate-100 rounded-lg p-3">
-                    <RefreshCw className="w-4 h-4 animate-spin text-slate-600" />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {questionCount >= 3 ? (
-              <div className="p-4 border-t bg-amber-50 text-amber-800 text-sm">
-                We have capped the number of clarifications on the presented data for API rate limiting, please re-use the explain with AI feature if you have more questions
-              </div>
-            ) : (
-              <div className="p-4 border-t">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={userInput}
-                    onChange={(e) => setUserInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    placeholder="Ask a follow-up question..."
-                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={aiLoading}
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={aiLoading || !userInput.trim()}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  {3 - questionCount} questions remaining
-                </p>
               </div>
             )}
+            <div ref={chatEndRef} />
           </div>
+
+          {questionCount >= 3 ? (
+            <div className="p-6 border-t bg-gradient-to-r from-amber-50 to-orange-50">
+              <div className="flex items-center gap-3">
+                <div className="text-2xl">⚠️</div>
+                <div>
+                  <p className="text-amber-900 text-sm font-bold">Question Limit Reached</p>
+                  <p className="text-amber-800 text-xs mt-1">
+                    We have capped the number of clarifications for API rate limiting. Please re-use the explain with AI feature for more questions.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 border-t bg-white">
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  placeholder="Ask a follow-up question..."
+                  className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  disabled={aiLoading}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={aiLoading || !userInput.trim()}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg font-semibold"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-2 font-medium">
+                {3 - questionCount} questions remaining
+              </p>
+            </div>
+          )}
         </div>
       )}
 
       {/* Filters Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="w-5 h-5 text-slate-600" />
-          <h3 className="font-semibold text-slate-900">Filters</h3>
-          <span className="text-sm text-slate-500 ml-2">
-            ({summary.total_incidents.toLocaleString()} incidents)
+      <div className="glass rounded-2xl p-6 card-hover">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl">
+            <Filter className="w-5 h-5 text-white" />
+          </div>
+          <h3 className="font-bold text-slate-900 text-lg">Filters</h3>
+          <span className="px-4 py-1.5 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 rounded-full text-sm font-semibold">
+            {summary.total_incidents.toLocaleString()} incidents
           </span>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Weather Filter */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-bold text-slate-800 mb-3">
               Weather Condition
             </label>
             <div className="flex flex-wrap gap-2">
@@ -474,10 +402,10 @@ export default function DashboardComponent() {
                 <button
                   key={weather}
                   onClick={() => handleFilterChange('weather', weather)}
-                  className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                  className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all hover:scale-105 ${
                     filters.weather === weather
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      ? 'filter-active text-white'
+                      : 'bg-blue-100 text-blue-800 hover:bg-blue-200 border-2 border-blue-300'
                   }`}
                 >
                   {weather}
@@ -488,7 +416,7 @@ export default function DashboardComponent() {
 
           {/* Light Condition Filter */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-bold text-slate-800 mb-3">
               Light Condition
             </label>
             <div className="flex flex-wrap gap-2">
@@ -496,10 +424,10 @@ export default function DashboardComponent() {
                 <button
                   key={light}
                   onClick={() => handleFilterChange('light', light)}
-                  className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                  className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all hover:scale-105 ${
                     filters.light === light
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      ? 'filter-active text-white'
+                      : 'bg-blue-100 text-blue-800 hover:bg-blue-200 border-2 border-blue-300'
                   }`}
                 >
                   {light}
@@ -510,7 +438,7 @@ export default function DashboardComponent() {
 
           {/* Collision Manner Filter */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-bold text-slate-800 mb-3">
               Collision Manner
             </label>
             <div className="flex flex-wrap gap-2">
@@ -518,10 +446,10 @@ export default function DashboardComponent() {
                 <button
                   key={collision}
                   onClick={() => handleFilterChange('collision', collision)}
-                  className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                  className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all hover:scale-105 ${
                     filters.collision === collision
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      ? 'filter-active text-white'
+                      : 'bg-blue-100 text-blue-800 hover:bg-blue-200 border-2 border-blue-300'
                   }`}
                 >
                   {collision}
@@ -532,7 +460,7 @@ export default function DashboardComponent() {
 
           {/* Work Zone Filter */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-bold text-slate-800 mb-3">
               Work Zone
             </label>
             <div className="flex flex-wrap gap-2">
@@ -540,10 +468,10 @@ export default function DashboardComponent() {
                 <button
                   key={value}
                   onClick={() => handleFilterChange('workzone', value)}
-                  className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                  className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all hover:scale-105 ${
                     filters.workzone === value
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      ? 'filter-active text-white'
+                      : 'bg-blue-100 text-blue-800 hover:bg-blue-200 border-2 border-blue-300'
                   }`}
                 >
                   {label}
@@ -556,16 +484,16 @@ export default function DashboardComponent() {
 
       {/* Summary Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {Object.entries(summary).map(([key, value]) => (
-          <div key={key} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 text-center">
-            <div className="text-3xl font-bold text-blue-700">{value.toLocaleString()}</div>
-            <div className="text-xs text-slate-600 mt-1 capitalize">{key.replace(/_/g, ' ')}</div>
+        {Object.entries(summary).map(([key, value], index) => (
+          <div key={key} className={`metric-card glass rounded-2xl p-6 text-center slide-in-up stagger-${index + 1} border-2 border-purple-200`}>
+            <div className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">{value.toLocaleString()}</div>
+            <div className="text-xs text-slate-800 font-bold uppercase tracking-wider">{key.replace(/_/g, ' ')}</div>
           </div>
         ))}
       </div>
 
       {/* Monthly Trend Line */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+      <div className="chart-container glass p-6">
         <Plot
           data={[
             {
@@ -573,27 +501,32 @@ export default function DashboardComponent() {
               y: monthly_trends.map(d => d.total),
               type: 'scatter',
               mode: 'lines+markers',
-              line: { color: '#2563eb', width: 3 },
-              marker: { size: 8 },
+              line: { color: '#8b5cf6', width: 3 },
+              marker: { size: 10, color: '#ec4899' },
+              fill: 'tozeroy',
+              fillcolor: 'rgba(139, 92, 246, 0.1)'
             },
           ]}
           layout={{
-            title: 'Monthly Incident Trends',
-            xaxis: { title: 'Month' },
-            yaxis: { title: 'Incidents' },
+            title: {
+              text: 'Monthly Incident Trends',
+              font: { size: 20, color: '#1e293b', family: 'Instrument Sans' }
+            },
+            xaxis: { title: 'Month', gridcolor: '#e2e8f0' },
+            yaxis: { title: 'Incidents', gridcolor: '#e2e8f0' },
             hovermode: 'x unified',
             paper_bgcolor: 'transparent',
-            plot_bgcolor: 'transparent',
-            margin: { t: 40, r: 40, b: 60, l: 60 },
+            plot_bgcolor: 'rgba(248, 250, 252, 0.5)',
+            margin: { t: 60, r: 40, b: 60, l: 60 },
           }}
           style={{ width: '100%', height: '400px' }}
           config={{ responsive: true }}
         />
       </div>
 
-      {/* Geographic Map */}
+      {/* Geographic Map - FIXED VERSION */}
       {geo_points.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <div className="chart-container glass p-6">
           <Plot
             data={[
               {
@@ -603,26 +536,39 @@ export default function DashboardComponent() {
                 text: hoverTexts,
                 mode: 'markers',
                 marker: {
-                  size: 9,
-                  color: '#ef4444',
-                  opacity: 0.7,
+                  size: 8,
+                  color: '#ec4899',
+                  opacity: 0.6,
                 },
+                hoverinfo: 'text',
               },
             ]}
             layout={{
-              title: `Incident Locations (${geo_points.length} points)`,
+              title: {
+                text: `Incident Locations (${geo_points.length} points)`,
+                font: { size: 20, color: '#1e293b', family: 'Instrument Sans' }
+              },
               mapbox: {
                 style: 'open-street-map',
-                zoom: 12,
-                center: { lat: 42.3876, lon: -71.0995 },
+                zoom: 11,
+                center: { lat: 42.3601, lon: -71.0589 },
               },
-              margin: { t: 40, r: 0, b: 0, l: 0 },
+              autosize: true,
+              margin: { t: 60, r: 0, b: 0, l: 0 },
               hovermode: 'closest',
               paper_bgcolor: 'transparent',
               plot_bgcolor: 'transparent',
             }}
             style={{ width: '100%', height: '600px' }}
-            config={{ responsive: true }}
+            config={{ 
+              responsive: true,
+              displayModeBar: true,
+              scrollZoom: true,
+              displaylogo: false,
+              modeBarButtonsToRemove: ['select2d', 'lasso2d'],
+              doubleClick: 'reset',
+            }}
+            useResizeHandler={true}
           />
         </div>
       )}
