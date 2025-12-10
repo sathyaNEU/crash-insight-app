@@ -43,7 +43,8 @@
             "@php artisan db:run-ddl",
             "@php artisan migrate --force",
             "npm install",
-            "npm run build"
+            "npm run build",
+            "docker-compose up -d --build --force-recreate"
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",

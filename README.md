@@ -1,368 +1,411 @@
-# Somerville Crash Analysis Dashboard
+# Crash Incident Analysis System
 
-A comprehensive traffic incident data management system for analyzing crash data in Somerville. This application provides a modern web interface for loading, viewing, and managing traffic incident records.
+A comprehensive crash incident analysis platform combining traditional data analytics with RAG (Retrieval Augmented Generation) for intelligent insights and AI-powered reporting.
 
-## Features
+## Architecture Overview
 
-- **Data Import**: Load traffic incident data from CSV files into the system
-- **Incident Viewer**: Browse and search through incident records with pagination
-- **Metrics Dashboard**: View comprehensive statistics after data import
-- **Responsive Design**: Modern, mobile-friendly interface built with React and Tailwind CSS
-
-## Tech Stack
-
-- **Backend**: Laravel (PHP)
-- **Frontend**: React with Tailwind CSS
-- **Database**: MySQL/PostgreSQL (configurable)
-- **Icons**: Lucide React
-
-## Prerequisites
-
-Before you begin, ensure you have the following installed on your system:
-
-- **PHP** >= 8.1
-- **Composer** (PHP dependency manager)
-- **Node.js** >= 16.x and npm
-- **MySQL** or **PostgreSQL** database server
-
-### Installing PHP
-
-**macOS (using Homebrew):**
-```bash
-brew install php@8.1
+```mermaid
+graph TD
+    subgraph "Data Sources"
+        API[Somerville Open Data API]
+        DB[(MySQL Database)]
+    end
+    
+    subgraph "Data Pipeline"
+        ETL[Laravel ETL Controller]
+        Reports[Report Generator]
+        Indexer[Vector Indexer]
+    end
+    
+    subgraph "Storage Layer"
+        MySQL[(MySQL Database)]
+        Pinecone[(Pinecone Vector Store)]
+    end
+    
+    subgraph "Application Layer"
+        Laravel[Laravel API Server :8000]
+        FastAPI[FastAPI Retrieval Service :8080]
+        Frontend[React Dashboard]
+    end
+    
+    subgraph "AI Services"
+        OpenAI[OpenAI Embeddings]
+        Mistral[Mistral LLM]
+    end
+    
+    API --> ETL
+    ETL --> MySQL
+    MySQL --> Reports
+    MySQL --> Indexer
+    Indexer --> OpenAI
+    OpenAI --> Pinecone
+    
+    Frontend --> Laravel
+    Laravel --> MySQL
+    Laravel --> FastAPI
+    FastAPI --> Pinecone
+    FastAPI --> OpenAI
+    Laravel --> Mistral
+    
+    style Pinecone fill:#f9f,stroke:#333,stroke-width:2px
+    style OpenAI fill:#9ff,stroke:#333,stroke-width:2px
+    style Mistral fill:#ff9,stroke:#333,stroke-width:2px
 ```
 
-**Ubuntu/Debian:**
-```bash
-sudo apt update
-sudo apt install php8.1 php8.1-cli php8.1-mbstring php8.1-xml php8.1-mysql php8.1-pgsql
-```
+## System Components
 
-**Windows:**
-Download from [windows.php.net](https://windows.php.net/download/)
+### 1. Data Layer
+- **MySQL Database**: Stores structured incident data with normalized dimensions
+- **Pinecone Vector Store**: Stores vector embeddings of pre-generated reports for semantic search
 
-### Installing Composer
+### 2. Backend Services
+- **Laravel API (Port 8000)**: Main application server handling data management and AI orchestration
+- **FastAPI Service (Port 8080)**: Dedicated retrieval service for RAG pipeline
 
-**macOS/Linux:**
-```bash
-curl -sS https://getcomposer.org/installer | php
-sudo mv composer.phar /usr/local/bin/composer
-```
+### 3. AI Services
+- **OpenAI**: Used exclusively for generating embeddings during indexing and retrieval
+- **Mistral AI**: Powers the conversational AI for generating insights and answering queries
 
-**Windows:**
-Download the installer from [getcomposer.org](https://getcomposer.org/download/)
+## Database Schema
 
-Verify installation:
-```bash
-composer --version
-```
+![Database Schema](public/schema.png)
 
-### Installing Node.js
+The database follows a star schema design with:
+- **Fact Table**: `incidents` - Core incident records
+- **Dimension Tables**: Weather conditions, light conditions, collision types, etc.
+- **View**: `incidents_view` - Denormalized view for analytics
 
-Download from [nodejs.org](https://nodejs.org/) or use a version manager like nvm:
+## Setup Instructions
 
-```bash
-# Using nvm
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-nvm install 16
-nvm use 16
-```
+### Prerequisites
+- PHP 8.1+
+- Python 3.11+
+- MySQL 8.0+
+- Docker & Docker Compose
+- Composer
+- pip
 
-## Installation
+### 1. Environment Configuration
 
-### 1. Clone the Repository
-
-```bash
-git clone <repository-url>
-cd somerville-crash-analysis
-```
-
-### 2. Install PHP Dependencies
-
-```bash
-composer install
-```
-
-This will install all required Laravel packages and dependencies.
-
-### 3. Environment Configuration
-
-Copy the example environment file and configure it:
-
-```bash
-cp .env.example .env
-```
-
-Edit the `.env` file with your database credentials:
+Create a `.env` file in the root directory:
 
 ```env
+# Database
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=somerville_crash_db
-DB_USERNAME=your_username
+DB_DATABASE=your_database
+DB_USERNAME=root
 DB_PASSWORD=your_password
+
+# AI Services
+MISTRAL_API_KEY=your_mistral_key
+OPENAI_API_KEY=your_openai_key
+PINECONE_API_KEY=your_pinecone_key
+PINECONE_INDEX_NAME=crash-incidents
 ```
 
-### 4. Bootstrap the Application
-
-Run the setup command to initialize the application:
+### 2. Install Dependencies
 
 ```bash
-composer run setup
+# Install Laravel dependencies
+composer install
+
+# Install Python dependencies
+pip install -r requirements.txt
 ```
 
-This command will:
-- Generate the application key
-- Run database migrations
-- Seed initial data (if applicable)
-- Clear and optimize caches
-
-### 5. Install Frontend Dependencies
+### 3. Database Setup
 
 ```bash
-npm install
+# Run migrations
+php artisan migrate
+
+# Load initial data
+curl -X POST http://localhost:8000/api/v1/load
 ```
 
-## Running the Application
+### 4. Generate Pre-computed Reports (Independent Workflow)
 
-### Development Server
-
-To start the development server with hot-reloading:
+Run the report generation notebook to create incident summaries:
 
 ```bash
-composer run dev
+jupyter notebook py-scripts/report.ipynb
 ```
 
-This command will:
-- Start the Laravel development server (typically on `http://localhost:8000`)
-- Start the Vite development server for frontend assets
-- Enable hot module replacement for frontend changes
+This notebook:
+- Connects to MySQL database
+- Generates detailed reports for each incident
+- Stores reports back in the database
 
-The application should now be accessible at `http://localhost:8000`
+**Note**: This is independent of vector indexing and can be run separately to regenerate reports.
 
-### Alternative: Run Services Separately
+### 5. Index Data into Vector Store (Independent Workflow)
 
-If you prefer to run the backend and frontend separately:
+Run the indexing pipeline to create embeddings:
 
-**Terminal 1 - Laravel Backend:**
 ```bash
+jupyter notebook py-scripts/indexing-pipeline.ipynb
+```
+
+This notebook:
+- Retrieves pre-generated reports from MySQL
+- Uses OpenAI embeddings (text-embedding-3-small)
+- Indexes into Pinecone vector store
+- Creates semantic search capability
+
+**Note**: Run this after generating reports to enable RAG functionality.
+
+### 6. Start Services
+
+```bash
+# Start FastAPI retrieval service
+docker-compose up -d
+
+# Start Laravel server
 php artisan serve
 ```
 
-**Terminal 2 - Vite Frontend:**
-```bash
-npm run dev
-```
-
-## Usage
-
-### Loading Data
-
-1. Navigate to the **Load Data** tab in the dashboard
-2. Click the **Load Data** button
-3. The system will process and import all traffic incident records
-4. Upon completion, you'll see metrics showing:
-   - Number of light conditions
-   - Number of weather conditions
-   - Number of road surfaces
-   - Number of traffic control devices
-   - Number of intersection types
-   - Number of road types
-   - Number of collision types
-   - Number of event locations
-   - Total number of incidents loaded
-
-### Viewing Incidents
-
-1. Navigate to the **View Incidents** tab
-2. Browse through the paginated incident records (20 per page)
-3. Use the pagination controls to navigate between pages
-4. Click **Refresh** to reload the latest data
-
 ## API Endpoints
 
-### Load Data
-```
-POST /api/v1/load
-```
-Processes and imports traffic incident data into the system.
+### Data Management APIs
+
+#### `GET /api/v1/incidents`
+Fetches all incidents from the `incidents_view`.
 
 **Response:**
 ```json
 {
-    "success": true,
-    "message": "Data loaded successfully",
-    "counts": {
-        "light_conditions": 7,
-        "weather_conditions": 9,
-        "road_surfaces": 9,
-        "traffic_control_devices": 8,
-        "intersection_types": 9,
-        "road_types": 5,
-        "collision_types": 8,
-        "event_locations": 7,
-        "incidents": 1000
+  "success": true,
+  "data": [...]
+}
+```
+
+**Purpose**: Provides complete incident dataset for dashboard visualization and filtering.
+
+---
+
+#### `POST /api/v1/load`
+Loads and processes data from Somerville Open Data API.
+
+**Purpose**: ETL endpoint that:
+- Fetches raw data from external API
+- Normalizes and loads dimension tables
+- Creates incident fact records
+- Returns loading statistics
+
+**Response:**
+```json
+{
+  "success": true,
+  "counts": {
+    "light_conditions": 5,
+    "weather_conditions": 8,
+    "incidents": 1234
+  }
+}
+```
+
+---
+
+#### `GET /api/v1/dashboard`
+Returns pre-computed analytics and metrics.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "summary": {...},
+    "by_weather": [...],
+    "monthly_trends": [...],
+    "geo_points": [...]
+  }
+}
+```
+
+**Purpose**: Provides aggregated statistics for dashboard visualizations without client-side computation.
+
+---
+
+### AI-Powered APIs
+
+#### `POST /api/v1/ai/chat`
+Handles AI-powered conversations and insights.
+
+**Request:**
+```json
+{
+  "question": "Explain the trend in accidents",
+  "data": [...],
+  "mode": "report|qa",
+  "isFollowUp": false,
+  "conversationHistory": []
+}
+```
+
+**Architecture Flow:**
+```mermaid
+sequenceDiagram
+    participant User
+    participant Laravel
+    participant FastAPI
+    participant Pinecone
+    participant OpenAI
+    participant Mistral
+
+    User->>Laravel: POST /api/v1/ai/chat
+    Laravel->>FastAPI: GET /retrieve?q=query
+    FastAPI->>OpenAI: Generate embedding
+    OpenAI-->>FastAPI: Embedding vector
+    FastAPI->>Pinecone: Similarity search
+    Pinecone-->>FastAPI: Top-k relevant chunks
+    FastAPI-->>Laravel: Retrieved context
+    Laravel->>Mistral: Generate response with context
+    Mistral-->>Laravel: AI-generated insight
+    Laravel-->>User: Final response
+```
+
+**Purpose**: 
+- **Report Mode**: Generates comprehensive analytical reports
+- **QA Mode**: Answers specific questions with data context
+- Supports follow-up conversations with history
+
+---
+
+### FastAPI Retrieval Service
+
+#### `GET :8080/retrieve`
+Semantic search endpoint for RAG pipeline.
+
+**Query Parameters:**
+- `q` (required): Search query
+- `k` (optional, default=5): Number of results
+
+**Response:**
+```json
+{
+  "query": "accidents in work zones",
+  "k": 5,
+  "results": [
+    {
+      "content": "Report text...",
+      "metadata": {
+        "incident_id": 123,
+        "crash_num": "ABC123",
+        "incident_date": "2024-01-15"
+      }
     }
+  ]
 }
 ```
 
-### Get Incidents
-```
-GET /api/v1/incidents
-```
-Retrieves all incident records from the database.
+**Purpose**: 
+- Converts queries to embeddings using OpenAI
+- Performs similarity search in Pinecone
+- Returns relevant incident reports as context
+- Enables RAG by providing grounded context to LLM
 
-**Response:**
-```json
-{
-    "success": true,
-    "data": [...]
-}
+---
+
+#### `GET :8080/health`
+Health check endpoint.
+
+**Purpose**: Monitors service availability for container orchestration.
+
+## RAG Pipeline Explained
+
+### Why RAG?
+
+Traditional LLMs have limitations:
+- No access to specific incident data
+- May hallucinate facts
+- Cannot provide grounded, verifiable insights
+
+RAG (Retrieval Augmented Generation) solves this by:
+1. **Retrieving** relevant context from our vector store
+2. **Augmenting** the LLM prompt with factual data
+3. **Generating** accurate, grounded responses
+
+### How It Works
+
+```mermaid
+flowchart TD
+    A[User Query] --> B[Generate Embedding]
+    B --> C[Search Pinecone]
+    C --> D[Retrieve Top-K Reports]
+    D --> E[Build Context]
+    E --> F[Send to Mistral]
+    F --> G[Generate Response]
+    G --> H[Return to User]
+    
+    style C fill:#f9f
+    style F fill:#ff9
 ```
 
-## Project Structure
+### Why OpenAI vs Mistral?
 
+- **OpenAI (`text-embedding-3-small`)**: Used for embeddings only
+  - High-quality semantic representations
+  - Consistent embedding space
+  - Cost-effective for retrieval
+  
+- **Mistral (`mistral-small-2506`)**: Used for text generation
+  - Excellent reasoning capabilities
+  - Strong analytical skills
+  - Better for conversational AI
+
+## Docker Architecture
+
+### FastAPI Container
+
+The retrieval service runs in an isolated container:
+
+```mermaid
+graph TB
+    subgraph Docker Container
+        FastAPI[FastAPI App]
+        Uvicorn[Uvicorn Server]
+    end
+    
+    Laravel[Laravel :8000] -->|HTTP Request| FastAPI
+    FastAPI -->|API Calls| Pinecone[Pinecone Cloud]
+    FastAPI -->|API Calls| OpenAI[OpenAI API]
+    
+    style Docker Container fill:#e1f5ff
 ```
-somerville-crash-analysis/
-├── app/
-│   ├── Http/
-│   │   └── Controllers/
-│   │       └── Api/
-│   ├── Models/
-│   └── Services/
-├── database/
-│   ├── migrations/
-│   └── seeders/
-├── resources/
-│   ├── js/
-│   │   ├── components/
-│   │   │   └── SomervilleCrashDashboard.jsx
-│   │   └── app.jsx
-│   └── views/
-├── routes/
-│   ├── api.php
-│   └── web.php
-├── public/
-├── composer.json
-├── package.json
-└── README.md
-```
 
-## Development
+**Benefits:**
+- Isolation from main application
+- Easy scaling
+- Independent deployment
+- Consistent environment
 
-### Running Tests
+### Container Configuration
+
+**Dockerfile**: Builds lightweight Python 3.11 container with FastAPI
+**docker-compose.yml**: Orchestrates service with environment variables and port mapping
+
+## Development Workflow
+
+### Quick Start
 
 ```bash
-php artisan test
+# Setup everything (database, dependencies, initial data)
+composer run setup
+
+# Start development servers (Laravel + FastAPI Docker container)
+composer run dev
 ```
 
-### Code Style
+### What `composer run setup` does:
+- Installs PHP and Node dependencies
+- Runs database migrations
+- Loads initial data from Somerville API
+- Generates application key
+- Builds and starts Docker container
 
-Format PHP code:
-```bash
-./vendor/bin/pint
-```
-
-Format JavaScript/React code:
-```bash
-npm run lint
-```
-
-### Database Migrations
-
-Create a new migration:
-```bash
-php artisan make:migration create_incidents_table
-```
-
-Run migrations:
-```bash
-php artisan migrate
-```
-
-Rollback migrations:
-```bash
-php artisan migrate:rollback
-```
-
-## Troubleshooting
-
-### Port Already in Use
-
-If port 8000 is already in use, specify a different port:
-```bash
-php artisan serve --port=8080
-```
-
-### Permission Issues
-
-If you encounter permission errors:
-```bash
-chmod -R 775 storage bootstrap/cache
-```
-
-### Database Connection Failed
-
-Ensure your database server is running and credentials in `.env` are correct:
-```bash
-# MySQL
-mysql -u your_username -p
-
-# PostgreSQL
-psql -U your_username
-```
-
-### Composer Memory Issues
-
-If composer runs out of memory:
-```bash
-COMPOSER_MEMORY_LIMIT=-1 composer install
-```
-
-## Production Deployment
-
-### Build Frontend Assets
-
-```bash
-npm run build
-```
-
-### Optimize Laravel
-
-```bash
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-```
-
-### Set Permissions
-
-```bash
-chmod -R 755 storage bootstrap/cache
-```
-
-### Configure Web Server
-
-Ensure your web server (Apache/Nginx) points to the `public` directory.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License.
-
-## Support
-
-For issues, questions, or contributions, please open an issue on the repository.
-
-## Acknowledgments
-
-- Traffic incident data provided by Somerville Department of Transportation
-- Built with Laravel, React, and Tailwind CSS
+### What `composer run dev` does:
+- Starts Laravel development server on port 8000
+- Ensures FastAPI Docker container is running on port 8080
+- Enables hot-reload for development
